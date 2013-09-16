@@ -3,8 +3,8 @@
 #region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Icon=Setup.ico
 #AutoIt3Wrapper_Outfile=Windows7GifViewer.exe
-Global $name = "Windows7GifViewer"	;the name of the programm is now stored in variable $Name, so if we want to change it, it's easy
-;Global $name = "WindowsPictureandFaxViewer"	;Posible alturnate name? Gif viewer implies Gifs only, and honestly, I like to change the origional files / naming as little as posible
+Global $Name = "Windows7GifViewer"	;the name of the programm is now stored in variable $Name, so if we want to change it, it's easy
+;Global $Name = "WindowsPictureandFaxViewer"	;Posible alturnate name? Gif viewer implies Gifs only, and honestly, I like to change the origional files / naming as little as posible
 #endregion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
 #cs ----------------------------------------------------------------------------
@@ -55,23 +55,23 @@ Global $name = "Windows7GifViewer"	;the name of the programm is now stored in va
 	You will require AutoIT version 3x to run this as an uncompiled script. Please use the exe provided.
 
 #ce ----------------------------------------------------------------------------
-$Title = "Windows 7 Fax & Scan Gif Viewer"
 #include <GUIConstantsEx.au3>
+#Include <ScrollBarConstants.au3>
 #include <WindowsConstants.au3>
 #include <EditConstants.au3>
 #include <StaticConstants.au3>
+#include <GUIEdit.au3>
 #include <File.au3>
 #include <Process.au3>
 #include <WinAPI.au3>
 
-;~ Opt("WinTitleMatchMode", 2)
+OnAutoItExitRegister("Cleanup")
 Global $aTypes[8] = [ 7, "BMP", "JPEG", "JPG", "PNG", "ICO", "TIFF", "GIF" ];used by instal, maininstaller, and uninstal funcs so moved up here
-;~ Global $name = "Windows7GifViewer.exe"	;Declaired up top, can be declaired here too
+;~ Global $Name = "Windows7GifViewer.exe"	;Declaired up top, can be declaired here too
 
 ;moved the main script up top
 ConsoleWrite("Hello"&@CRLF)
 MainInstaller()
-Cleanup()
 ConsoleWrite("Bye"&@CRLF)
 
 ;then have all the functions. It doesn't really matter, but most people have
@@ -79,11 +79,13 @@ ConsoleWrite("Bye"&@CRLF)
 ;	then main code,
 ;	then functions underneith
 Func MainInstaller()
-	Local $defaultpath = @ProgramFilesDir&"\"&$name
+	Local $defaultpath = @ProgramFilesDir&"\"&$Name
 	Local $cTypes[$aTypes[0]+1], $iCurTab, $iNextTab, $i, $Quick = False
 	Local $hTab[5]
 	Consolewrite("Started Main loop"&@CRLF)
 	Consolewrite("Generating GUI..."&@CRLF)
+
+	FileInstall('.\splash.jpg',@TempDir&'\splash.jpg')
 
 	#Region ### START Koda GUI section ### Form=
 	$GUI = GUICreate("Windows Picture and Fax Viewer for Win7", 426, 342, 192, 124)
@@ -131,6 +133,7 @@ Func MainInstaller()
 		$nMsg = GUIGetMsg()
 		Switch $nMsg
 			Case $GUI_EVENT_CLOSE
+				FileDelete(@TempDir&"\splash.jpg")
 				Exit
 
 			Case $bNext
@@ -166,7 +169,7 @@ Func MainInstaller()
 			ConsoleWrite("HI	"&$iCurTab&@CRLF)
 			Switch $iCurTab
 				Case 3
-					If $Quick = True or MsgBox(4, "Install", "Ready to start instalation?") = 6 Then
+;~ 					If $Quick = True or MsgBox(4, "Install", "Ready to start instalation?") = 6 Then
 						$sTemp = ""
 						For $i = 1 To $aTypes[0]
 							If GUICtrlRead($cTypes[$i]) = $GUI_CHECKED Then $sTemp &= $aTypes[$i] & "|"
@@ -188,7 +191,7 @@ Func MainInstaller()
 
 						If $result = 1 Then GUICtrlSetState($hTab[$iCurTab + 1], $GUI_SHOW)
 
-					EndIf
+;~ 					EndIf
 			EndSwitch
 
 		EndIf
@@ -211,8 +214,8 @@ Func WPaFV_Install($Path, $sTypes = 'GIF', $Quick = False)
 	EndIf
 
 
-	If StringRight($Path, StringLen($name)) = $name Then $Path = StringReplace($Path, "\"&$name, "")
-	_ConsoleWrite("Path = "& $Path & "\"&$name&@CRLF)
+	If StringRight($Path, StringLen($Name)) = $Name Then $Path = StringReplace($Path, "\"&$Name, "")
+	_ConsoleWrite("Path = "& $Path & "\"&$Name&@CRLF)
 
 
 	;Detect if another installation exists
@@ -226,7 +229,7 @@ Func WPaFV_Install($Path, $sTypes = 'GIF', $Quick = False)
 		;If we're doign a quick install don't ask questions just get it done
 		If $Quick Then
 			_Consolewrite("	Removing...")
-			WPaFV_Uninstall($Path, "All")
+			WPaFV_Uninstall($Path, "GIF")
 			_Consolewrite("	Done"&@CRLF)
 
 		Else	;Otherwise ask to remove
@@ -235,7 +238,7 @@ Func WPaFV_Install($Path, $sTypes = 'GIF', $Quick = False)
 			Switch MsgBox(3, "Application already installed", "Setup has detected a previous installation" & @CRLF & "Would you like to uninstall the existing Windows 7 Gif Viewer first?")
 				Case 6	;they say yes
 					_Consolewrite("	Removing...")
-					WPaFV_Uninstall($Path, "All")
+					WPaFV_Uninstall($Path, "GIF")
 					_Consolewrite("	Done"&@CRLF)
 
 				Case 2	;they say no
@@ -292,7 +295,7 @@ Func WPaFV_Install($Path, $sTypes = 'GIF', $Quick = False)
 		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document\DefaultIcon', '', REG_EXPAND_SZ, @" & $Path & '\' & $Name & '\shimgvw.dll,4'&@CRLF)
 		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document\shell', 				'', 		'REG_SZ', 			'')
 		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document\shell, '', REG_SZ, ''"&@CRLF)
-		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document\shell\open', 			'', 		'REG_SZ', 			'Windows 7 '&$Type&' Viewer')
+		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document\shell\open', 			'', 		'REG_SZ', 			$Name)
 		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document\shell\open, '', REG_SZ, Windows 7 "&$Type&' Viewer'&@CRLF)
 		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document\shell\open', 			'Icon', 	'REG_SZ', 			$Path & '\' & $Name & '\shimgvw.dll,1')
 		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document\shell\open, Icon, REG_SZ, " & $Path & '\' & $Name & '\shimgvw.dll,1'&@CRLF)
@@ -345,6 +348,9 @@ EndFunc
 Func _Consolewrite($s)
 	Consolewrite($s); holder for proper logging
 	GUICtrlSetData($Edit1, GUICtrlRead($Edit1) & $s)
+	local $iEnd = StringLen(GUICtrlRead($Edit1))
+    _GUICtrlEdit_SetSel($Edit1, $iEnd, $iEnd)
+	_GUICtrlEdit_Scroll($Edit1, $SB_SCROLLCARET)
 EndFunc
 
 Func CleanOtherInstalls()
