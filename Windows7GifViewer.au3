@@ -3,6 +3,8 @@
 #region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Icon=Setup.ico
 #AutoIt3Wrapper_Outfile=Windows7GifViewer.exe
+Global $name = "Windows7GifViewer"	;the name of the programm is now stored in variable $Name, so if we want to change it, it's easy
+;Global $name = "WindowsPictureandFaxViewer"	;Posible alturnate name? Gif viewer implies Gifs only, and honestly, I like to change the origional files / naming as little as posible
 #endregion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
 #cs ----------------------------------------------------------------------------
@@ -55,43 +57,298 @@
 #ce ----------------------------------------------------------------------------
 $Title = "Windows 7 Fax & Scan Gif Viewer"
 #include <GUIConstantsEx.au3>
-#include <File.au3>
-#include <Process.au3>
-#include <GUIConstantsEx.au3>
-#include <File.au3>
 #include <WindowsConstants.au3>
-#include <WinAPI.au3>
 #include <EditConstants.au3>
 #include <StaticConstants.au3>
+#include <File.au3>
+#include <Process.au3>
+#include <WinAPI.au3>
 
-Opt("WinTitleMatchMode", 2)
+;~ Opt("WinTitleMatchMode", 2)
+Global $aTypes[8] = [ 7, "BMP", "JPEG", "JPG", "PNG", "ICO", "TIFF", "GIF" ];used by instal, maininstaller, and uninstal funcs so moved up here
+;~ Global $name = "Windows7GifViewer.exe"	;Declaired up top, can be declaired here too
+
+;moved the main script up top
+ConsoleWrite("Hello"&@CRLF)
+MainInstaller()
+Cleanup()
+ConsoleWrite("Bye"&@CRLF)
+
+;then have all the functions. It doesn't really matter, but most people have
+;	includes and global declaration at top,
+;	then main code,
+;	then functions underneith
+Func MainInstaller()
+	Local $defaultpath = @ProgramFilesDir&"\"&$name
+	Local $cTypes[$aTypes[0]+1], $iCurTab, $iNextTab, $i, $Quick = False
+	Local $hTab[5]
+	Consolewrite("Started Main loop"&@CRLF)
+	Consolewrite("Generating GUI..."&@CRLF)
+
+	#Region ### START Koda GUI section ### Form=
+	$GUI = GUICreate("Windows Picture and Fax Viewer for Win7", 426, 342, 192, 124)
+	GUICtrlCreatePic(@TempDir & "\splash.jpg", 0, 0, 425, 155)
+	$hTabs = GUICtrlCreateTab(0, 160, 425, 153)
+	$hTab[0] = GUICtrlCreateTabItem("Welcome!")
+		GUICtrlSetState(-1,$GUI_SHOW)
+		GUICtrlCreateLabel( "Welcome to the Windows Picture and Fax Viewer installer for Win7 (and maybe 8)."&@CRLF& _
+							"This will install Windows Picture and Fax Viewer, the picture viewer that came stock with XP. "& _
+							"If you liked the way Windows Picture and Fax Viewer worked in WinXP, then you'll like this."&@CRLF&@CRLF& _
+							"Windows Picture and Fax Viewer.", 8, 186, 399, 78)
+
+	$hTab[1] = GUICtrlCreateTabItem("Install Path")
+		GUICtrlCreateLabel("Please select the directory to install Windows Picture and Fax Viewer:", 8, 192, 329, 17)
+		$iPath = GUICtrlCreateInput($defaultpath, 8, 216, 335, 21)
+		$bBrowse = GUICtrlCreateButton("Browse...", 344, 216, 72, 21)
+
+	$hTab[2] = GUICtrlCreateTabItem("File Types")
+		Consolewrite("	Loading types...")
+		For $i = 1 to $aTypes[0]
+			Consolewrite("	"&$aTypes[$i])
+			$cTypes[$i] = GUICtrlCreateCheckbox("."&$aTypes[$i], (144*Mod($i,3))-120+144, 192+(24*Floor(($i-1)/3)), 97, 17)
+			if $aTypes[$i] = "GIF" Then GUICtrlSetState( $cTypes[$i], $GUI_CHECKED)
+		Next
+		Consolewrite("	Done!"&@CRLF)
+
+	$hTab[3] = GUICtrlCreateTabItem("Instalation Progress")
+		Global $Edit1 = GUICtrlCreateEdit("", 8, 184, 409, 121, BitOR($ES_AUTOVSCROLL,$ES_WANTRETURN,$WS_VSCROLL,$WS_HSCROLL))
+		GUICtrlSetData(-1, "Started, Creating GUI..."&@CRLF)
+
+	$hTab[4] = GUICtrlCreateTabItem("Status")
+
+	GUICtrlCreateTabItem("")
+
+	$bQuickInstall = GUICtrlCreateButton("Just install the damn thing", 78, 314, 184, 25)
+	$bUninstall = GUICtrlCreateButton("Uninstall", 2, 314, 75, 25)
+	$bNext = GUICtrlCreateButton("Next", 347, 314, 75, 25)
+	$bPrev = GUICtrlCreateButton("Back", 271, 314, 75, 25)
+	GUICtrlSetState($bPrev, $GUI_HIDE)
+	GUISetState(@SW_SHOW)
+	#EndRegion ### END Koda GUI section ###
+	_Consolewrite("GUI Done! Starting Main Loop"&@CRLF)
+
+	While 1
+		$nMsg = GUIGetMsg()
+		Switch $nMsg
+			Case $GUI_EVENT_CLOSE
+				Exit
+
+			Case $bNext
+				$iCurTab = GUICtrlRead($hTabs)
+				GUICtrlSetState($hTab[$iCurTab + 1], $GUI_SHOW)
+				$nMsg = $hTabs
+
+			Case $bPrev
+				$iCurTab = GUICtrlRead($hTabs)
+				GUICtrlSetState($hTab[$iCurTab - 1], $GUI_SHOW)
+				$nMsg = $hTabs
+
+			Case $bQuickInstall
+				$Quick = True
+				GUICtrlSetState($hTab[3], $GUI_SHOW)
+				$nMsg = $hTabs
+
+		EndSwitch
+
+		If $nMsg = $hTabs Then
+			$iCurTab = GUICtrlRead($hTabs)
+			If $iCurTab <= 0 Then
+				GUICtrlSetState($bPrev, $GUI_HIDE)
+				GUICtrlSetState($bNext, $GUI_SHOW)
+			ElseIf $iCurTab >= UBound($hTab)-1 Then
+				GUICtrlSetState($bPrev, $GUI_SHOW)
+				GUICtrlSetState($bNext, $GUI_HIDE)
+			Else
+				GUICtrlSetState($bPrev, $GUI_SHOW)
+				GUICtrlSetState($bNext, $GUI_SHOW)
+			EndIf
+
+			ConsoleWrite("HI	"&$iCurTab&@CRLF)
+			Switch $iCurTab
+				Case 3
+					If $Quick = True or MsgBox(4, "Install", "Ready to start instalation?") = 6 Then
+						$sTemp = ""
+						For $i = 1 To $aTypes[0]
+							If GUICtrlRead($cTypes[$i]) = $GUI_CHECKED Then $sTemp &= $aTypes[$i] & "|"
+						Next
+						$sTemp = StringTrimRight($sTemp,1)
+
+						GUICtrlSetState($bNext, $GUI_DISABLE)
+						GUICtrlSetState($bPrev, $GUI_DISABLE)
+						GUICtrlSetState($bQuickInstall, $GUI_DISABLE)
+						GUICtrlSetState($bUninstall, $GUI_DISABLE)
+						ConsoleWrite("GIF_Install	"&GUICtrlRead($iPath)&"	"&$sTemp&@CRLF)
+						$result = WPaFV_Install(GUICtrlRead($iPath),$sTemp, $Quick)
+						sleep(2000)
+						$Quick = False
+						GUICtrlSetState($bNext, $GUI_ENABLE)
+						GUICtrlSetState($bPrev, $GUI_ENABLE)
+						GUICtrlSetState($bQuickInstall, $GUI_ENABLE)
+						GUICtrlSetState($bUninstall, $GUI_ENABLE)
+
+						If $result = 1 Then GUICtrlSetState($hTab[$iCurTab + 1], $GUI_SHOW)
+
+					EndIf
+			EndSwitch
+
+		EndIf
+
+	WEnd
+
+EndFunc
 
 
-Func CreateSplash()
-	EnvSet("path", EnvGet("path") & ";" & @ScriptDir)
-	;Include splash image in exe
-	FileInstall("splash.jpg", @TempDir & "\splash.jpg", 1)
+Func WPaFV_Install($Path, $sTypes = 'GIF', $Quick = False)
 
-	;Show splash
-	$splash = GUICreate("Loading...", 430, 154, -1, -1, $WS_POPUPWINDOW)
-	WinSetTrans($splash, "", 0)
-	GUICtrlCreatePic(@TempDir & "\splash.jpg", -0, -0, 432, 155)
-	GUISetState(@SW_SHOW, $splash)
-	For $i = 0 To 255 Step 6
-		WinSetTrans($splash, "", $i)
-		Sleep(1)
-	Next
-	Sleep(3000)
-	GUIDelete($splash)
-	MsgBox(0, "", "Please select a location to install Windows 7 Gif Viewer")
-EndFunc   ;==>CreateSplash
+	Local $aTypes = StringSplit($sTypes,'|')
+	Local $iType, $Type
+	_ConsoleWrite("Starting Install"&@CRLF)
+
+	ConsoleWrite($sTypes&@CRLF)
+	If not IsArray($aTypes) Then
+		ConsoleWrite("ERROR -2: Type error!"&@CRLF)
+		return -2
+	EndIf
 
 
-Func SystemCheck()
-	Local $path = FileSelectFolder("Please select install location", "")
-	Local $command, $command1, $command2, $command3, $command4, $command5, $Msg1
+	If StringRight($Path, StringLen($name)) = $name Then $Path = StringReplace($Path, "\"&$name, "")
+	_ConsoleWrite("Path = "& $Path & "\"&$name&@CRLF)
+
+
 	;Detect if another installation exists
-	If FileExists('C:\rundll32.exe') Then
+	CleanOtherInstalls()
+
+	_Consolewrite("Checking for old installs..."&@CRLF)
+	;If already installed (by registry check)
+	If RegRead("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers", $Path & "\" & $Name & "\rundll32.exe") = "WINXPSP3" Or FileExists($Path & '\" & $Name & "') Then
+
+		_Consolewrite("	Old installs found"&@CRLF)
+		;If we're doign a quick install don't ask questions just get it done
+		If $Quick Then
+			_Consolewrite("	Removing...")
+			WPaFV_Uninstall($Path, "All")
+			_Consolewrite("	Done"&@CRLF)
+
+		Else	;Otherwise ask to remove
+
+			_Consolewrite("	Asking user to remove old installs")
+			Switch MsgBox(3, "Application already installed", "Setup has detected a previous installation" & @CRLF & "Would you like to uninstall the existing Windows 7 Gif Viewer first?")
+				Case 6	;they say yes
+					_Consolewrite("	Removing...")
+					WPaFV_Uninstall($Path, "All")
+					_Consolewrite("	Done"&@CRLF)
+
+				Case 2	;they say no
+					_Consolewrite("ERROR -1: Installation Cancled by User. Click the install button below to retry.")
+					Return -1
+
+			EndSwitch	;In this case, no and no response is the same thing so just ocntinue the script
+
+		EndIf	;end quickinstall check
+	EndIf	;end already installed check
+	_Consolewrite("Check end"&@CRLF)
+
+	_Consolewrite('Installing...' & @CRLF)
+	;Let's copy the system's rundll32.exe. Not only will this reduce file size
+	;	but will prevent other malicious jerks from changing it with a bad exe,
+	;	and will prevent "exe in an exe" flags from antiviri
+	;	Flag 9 will overwrite (flag 1), AND make the folder if it does not exist! (flag 8)
+	FileCopy(@WindowsDir & '\system32\rundll32.exe', $Path & '\' & $Name & '\rundll32.exe', 9)
+	_Consolewrite(@error&'	Copied "'&@WindowsDir & '\system32\rundll32.exe" to '& $Path & '\' & $Name & '\rundll32.exe'&@CRLF)
+
+	;Using ".\shimgvw.dll" is the same as @ScriptDir & "\shimgvw.dll",
+	;	so it will use the dll that's in the source folder
+	FileInstall('.\shimgvw.dll', $Path & '\' & $Name & '\shimgvw.dll', 1)
+	_Consolewrite(@error&'	Installed shimgvw.dll to ' & $Path & '\' & $Name & '\shimgvw.dll'&@CRLF)
+
+	;Note:- This works from an uncompiled script and the source files can be either in the script directory or referenced from somewhere else in this case and works
+	;For some reason again this likes to only register from the command line?
+	Run(@ComSpec & ' /c regsvr32 /s ' & $Path & "\" & $Name & "\rundll32.exe", 	$Path & "\" & $Name, @SW_HIDE)
+	_Consolewrite(@error&'	' & @ComSpec & ' /c regsvr32 /s ' & $Path & "\" & $Name & "\rundll32.exe" & @CRLF)
+	Run(@ComSpec & ' /c regsvr32 /s ' & $Path & "\" & $Name & "\shimgvw.dll", 	$Path & "\" & $Name, @SW_HIDE)
+	_Consolewrite(@error&'	' & @ComSpec & ' /c regsvr32 /s ' & $Path & "\" & $Name & "\shimgvw.dll" & @CRLF)
+
+	for $iType = 1 to $aTypes[0]
+		$Type = $aTypes[$iType]	;I like arrays. Can you tell? :D
+
+		_Consolewrite("	Regestering type "&$Type&@CRLF)
+		;Here commence normal Writes to the registry....all is good from here on
+		RegWrite('HKEY_CLASSES_ROOT\.'&$Type, 										'', 				'REG_SZ', 			$Type&'Image.Document')
+		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\."&$Type&", '', 'REG_SZ', "&$Type&'Image.Document'&@CRLF)
+		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document', 'EditFlags', 			'REG_DWORD', 		'65536')
+		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document, EditFlags, REG_DWORD, 65536"&@CRLF)
+		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document', 'FriendlyTypeName', 	'REG_EXPAND_SZ', 	'@' & $Path & '\' & $Name & '\shimgvw.dll,-306')
+		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document, FriendlyTypeName, REG_EXPAND_SZ, @"& $Path & '\' & $Name & '\shimgvw.dll,-306'&@CRLF)
+		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document', 'InstallTemp',		'REG_EXPAND_SZ', 	@ScriptDir)
+		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document, InstallTemp,	REG_EXPAND_SZ, "&@ScriptDir&@CRLF)
+		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document', 'ImageOptionFlags', 	'REG_DWORD', 		'0')
+		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document, ImageOptionFlags, REG_DWORD, 0"&@CRLF)
+		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document', 'BrowserFlags', 		'REG_DWORD', 		'8')
+		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document, BrowserFlags, REG_DWORD, 8"&@CRLF)
+		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document', '', 					'REG_SZ', 			$Type&' Image')
+		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document, '', REG_SZ, "&$Type&' Image'&@CRLF)
+
+		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document\DefaultIcon', 			'', 		'REG_EXPAND_SZ',	'@' & $Path & '\' & $Name & '\shimgvw.dll,4')
+		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document\DefaultIcon', '', REG_EXPAND_SZ, @" & $Path & '\' & $Name & '\shimgvw.dll,4'&@CRLF)
+		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document\shell', 				'', 		'REG_SZ', 			'')
+		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document\shell, '', REG_SZ, ''"&@CRLF)
+		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document\shell\open', 			'', 		'REG_SZ', 			'Windows 7 '&$Type&' Viewer')
+		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document\shell\open, '', REG_SZ, Windows 7 "&$Type&' Viewer'&@CRLF)
+		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document\shell\open', 			'Icon', 	'REG_SZ', 			$Path & '\' & $Name & '\shimgvw.dll,1')
+		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document\shell\open, Icon, REG_SZ, " & $Path & '\' & $Name & '\shimgvw.dll,1'&@CRLF)
+		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document\shell\open\command', 	'', 		'REG_EXPAND_SZ',	$Path & '\' & $Name & '\rundll32.exe shimgvw.dll,ImageView_Fullscreen %1')
+		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document\shell\open\command, '', 'REG_EXPAND_SZ', " & $Path & '\' & $Name & '\rundll32.exe shimgvw.dll,ImageView_Fullscreen %1'&@CRLF)
+		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document\shell\open\DropTarget', 'Clsid', 	'REG_SZ', 			'{E84FDA7C-1D6A-45F6-B725-CB260C236066}')
+		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document\shell\open\DropTarget, Clsid, REG_SZ, {E84FDA7C-1D6A-45F6-B725-CB260C236066}"&@CRLF)
+		RegWrite('HKEY_CLASSES_ROOT\'&$Type&'Image.Document\shell\printto\command',	'', 		'REG_SZ', 			$Path & '\' & $Name & '\rundll32.exe shimgvw.dll,ImageView_PrintTo /pt "%1" "%2" "%3" "%4"')
+		_Consolewrite("	"&@error&"	Registering	HKEY_CLASSES_ROOT\"&$Type&"Image.Document\shell\printto\command, '', 'REG_SZ', " & $Path & '\' & $Name & '\rundll32.exe shimgvw.dll,ImageView_PrintTo /pt "%1" "%2" "%3" "%4"'&@CRLF)
+		_Consolewrite(@CRLF)
+
+	Next
+
+	_Consolewrite("	Setting Compatibility Mode..."&@CRLF)
+	RegWrite('HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers', $Path & '\' & $Name & '\rundll32.exe', 'REG_SZ', 'WINXPSP3')
+	;Corrected the key from HKLM to HKCU to make this work - This is why rundll32.exe was not actually being set to Windows SP3 mode
+	RegWrite('HKEY_CURRENT_USER\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers', $Path & '\' & $Name & '\rundll32.exe', 'REG_SZ', 'WINXPSP3')
+
+	RunWait(@ComSpec & " /e:on /f:on /s /k ", "taskkill /f /IM explorer.exe >nul 2>&1", @SW_HIDE)
+
+	_Consolewrite("Installation completed successfully!"&@CRLF&"Open an image and see if it worked."&@CRLF&"To reinstall, hit back then next or click the download button below"&@CRLF)
+	return 1
+EndFunc
+
+Func WPaFV_Uninstall($Path, $sTypes = 'ALL')
+	If $sTypes <> "ALL" Then Local $aTypes = StringSplit($sTypes,'|')
+	Local $iType, $Type
+	_Consolewrite('Removeing...' & @CRLF)
+	for $iType = 1 to $aTypes[0]
+		$Type = $aTypes[$iType]	;makes it simpler on our brains for the rest of it
+		_Consolewrite('	'&$Type&@CRLF)
+		RegDelete('HKEY_CLASSES_ROOT\.' & $Type)
+		_Consolewrite(@error & '	HKEY_CLASSES_ROOT\.' & $Type &@CRLF)
+
+		RegDelete('HKEY_CLASSES_ROOT\' & $Type & 'Image.Document')
+		_Consolewrite(@error & '	HKEY_CLASSES_ROOT\' & $Type & 'Image.Document' &@CRLF)
+
+		RegDelete('HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers', $Path & '\' & $Name & '\rundll32.exe')
+		_Consolewrite(@error & '	HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers	' & $Path & '\' & $Name & '\rundll32.exe' &@CRLF)
+
+	Next
+	FileSetAttrib($Path, "-RS", 1)	;should work, will test. Filedelete can't delete files of certin attibutes (Probably as a security feature). We'll use dos if we have to
+	FileDelete($Path & "\" & $Name)
+	DirRemove($Path & "\" & $Name)
+	;neither of the above work so good ol dos seems to do the trick here
+;~ 	Run(@ComSpec & ' /c rd ' & $Name & ' >nul 2>&1', $Path, @SW_HIDE)	;you don't need to specify a variable for the command
+;~ 	Run(@ComSpec & ' /c del /Q' & $Path & '\' & $Name & ' >nul 2>&1', $Path, @SW_HIDE)	;and you could have reused $command instead of making a $command1, $command2, etc
+EndFunc
+
+Func _Consolewrite($s)
+	Consolewrite($s); holder for proper logging
+	GUICtrlSetData($Edit1, GUICtrlRead($Edit1) & $s)
+EndFunc
+
+Func CleanOtherInstalls()
+		If FileExists('C:\rundll32.exe') Then
 		FileDelete('C:\rundll32.exe')
 	EndIf
 	If FileExists('C:\shimgvw.dll') Then
@@ -106,116 +363,8 @@ Func SystemCheck()
 	If FileExists('C:\Windows\Gif') Then
 		Run(@ComSpec & " /c rd C:\Windows\Gif", @SW_HIDE)
 	EndIf
-	If RegRead("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers", $path & "\Windows7GifViewer\rundll32.exe") = "WINXPSP3" Or FileExists($path & '\Windows7GifViewer') Then
-		;If one does exist ask to remove it
-		$Msg1 = MsgBox(3, "Application already installed", "Setup has detected a previous installation" & @CRLF & "Would you like to uninstall the existing Windows 7 Gif Viewer first?")
-		Select
-			Case $Msg1 = 6
-				ConsoleWrite("Remove" & @CRLF)
-				RegDelete('HKEY_CLASSES_ROOT\.GIF')
-				RegDelete('HKEY_CLASSES_ROOT\GIFImage.Document')
-				RegDelete("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers", $path & "\Windows7GifViewer\rundll32.exe")
-				FileDelete($path & "\Windows7GifViewer")
-				DirRemove($path & "\Windows7GifViewer")
-				;neither of the above work so good ol dos seems to do the trick here
-				$command = 'rd Windows7GifViewer ' & '>nul ' & '2>&1'
-				Run(@ComSpec & " /c " & $command, $path, @SW_HIDE)
-				$command1 = 'del /Q' & $path & '\Windows7GifViewer ' & '>nul ' & '2>&1'
-				Run(@ComSpec & " /c " & $command, $path, @SW_HIDE)
-				MsgBox(0, "Existing Installation Removed", "Please re-run the installer to install again")
-			Case $Msg1 = 7
-				Local $RegPath = ($path & "\Windows7GifViewer\shimgvw.dll,4")
-				; Double check there's no directory before prompting the user if they want to create one
-				If Not FileExists($path & '\Windows7GifViewer') Then
-					If MsgBox(36, "Location does not exist", "There is no directory for Windows 7 Gif Viewer? " & @CRLF & "Would you like to create one?") = 6 Then
-						DirCreate($path & '\Windows7GifViewer')
-						ConsoleWrite("Install" & @CRLF)
-						;Commence installation
-						FileInstall("E:\Users\James\Dropbox\WinApps\Windows7GifViewer\rundll32.exe", $path & "\Windows7GifViewer\rundll32.exe", 1)
-						FileInstall("E:\Users\James\Dropbox\WinApps\Windows7GifViewer\shimgvw.dll", $path & "\Windows7GifViewer\shimgvw.dll", 1)
-						;Note:- This works from an uncompiled script and the source files can be either in the script directory or referenced from somewhere else in this case and works
-						;For some reason again this likes to only register from the command line?
-						$command4 = 'regsvr32 /s ' & $path & "\Windows7GifViewer\rundll32.exe"
-						$command5 = 'regsvr32 /s ' & $path & "\Windows7GifViewer\shimgvw.dll"
-						Run(@ComSpec & " /c " & $command4, $path & "\Windows7GifViewer", @SW_HIDE)
-						Run(@ComSpec & " /c " & $command5, $path & "\Windows7GifViewer", @SW_HIDE)
-						;Here commence normal Writes to the registry....all is good from here on
-						RegWrite('HKEY_CLASSES_ROOT\.GIF', '', 'REG_SZ', 'GIFImage.Document')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document', 'EditFlags', 'REG_DWORD', '65536')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document', 'FriendlyTypeName', 'REG_EXPAND_SZ', '@' & $path & '\Windows7GifViewer\shimgvw.dll,-306')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document', 'InstallTemp', 'REG_EXPAND_SZ', @ScriptDir)
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document', 'ImageOptionFlags', 'REG_DWORD', '0')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document', 'BrowserFlags', 'REG_DWORD', '8')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document', '', 'REG_SZ', 'GIF Image')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document\DefaultIcon', '', 'REG_EXPAND_SZ', '@' & $path & '\Windows7GifViewer\shimgvw.dll,4')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document\shell', '', 'REG_SZ', '')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document\shell\open', '', 'REG_SZ', 'Windows 7 Gif Viewer')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document\shell\open', 'Icon', 'REG_SZ', $path & '\Windows7GifViewer\shimgvw.dll,1')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document\shell\open\command', '', 'REG_EXPAND_SZ', $path & '\Windows7GifViewer' & '\rundll32.exe shimgvw.dll,ImageView_Fullscreen %1')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document\shell\open\DropTarget', 'Clsid', 'REG_SZ', '{E84FDA7C-1D6A-45F6-B725-CB260C236066}')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document\shell\printto\command', '', 'REG_SZ', $path & '\Windows7GifViewer' & '\rundll32.exe shimgvw.dll,ImageView_PrintTo /pt "%1" "%2" "%3" "%4"')
-						RegWrite('HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers', $path & '\Windows7GifViewer' & '\rundll32.exe', 'REG_SZ', 'WINXPSP3')
-						;Corrected the key from HKLM to HKCU to make this work - This is why rundll32.exe was not actually being set to Windows SP3 mode
-						RegWrite('HKEY_CURRENT_USER\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers', $path & '\Windows7GifViewer' & '\rundll32.exe', 'REG_SZ', 'WINXPSP3')
-						MsgBox(0, "Installation Complete!", "To run double click or open any .Gif file. Run again to Uninstall")
-						RunWait(@ComSpec & " /e:on /f:on /s /k ", "taskkill /f /IM explorer.exe >nul 2>&1", @SW_HIDE)
-					EndIf
-				EndIf
-			Case $Msg1 = 2
-				MsgBox(48 + 4096, "Installation Aborted!", "User cancelled installation", 5)
-				;This part will only work once the script is compiled
-				If ProcessExists("Windows_7_Gif_Viewer.exe") Then
-					OnAutoItExitRegister("Restart")
-					Exit
-				EndIf
-		EndSelect
-	Else
-		;Obviously here I was lazy and couldn't bothered to a re-arrange all my code with a nicer loop
-		;A good developer never re-uses large chunks of code twice!
-		If Not FileExists($path & '\Windows7GifViewer') Then
-			If MsgBox(36, "Location does not exist", "There is no directory for Windows 7 Gif Viewer? " & @CRLF & "Would you like to create one?") = 6 Then
-				DirCreate($path & '\Windows7GifViewer')
-						ConsoleWrite("Install" & @CRLF)
-						;Commence installation
-						FileInstall("E:\Users\James\Dropbox\WinApps\Windows7GifViewer\rundll32.exe", $path & "\Windows7GifViewer\rundll32.exe", 1)
-						FileInstall("E:\Users\James\Dropbox\WinApps\Windows7GifViewer\shimgvw.dll", $path & "\Windows7GifViewer\shimgvw.dll", 1)
-						;Note:- This works from an uncompiled script and the source files can be either in the script directory or referenced from somewhere else in this case and works
-						;For some reason again this likes to only register from the command line?
-						$command2 = 'regsvr32 /s ' & $path & "\Windows7GifViewer\rundll32.exe"
-						$command3 = 'regsvr32 /s ' & $path & "\Windows7GifViewer\shimgvw.dll"
-						Run(@ComSpec & " /c " & $command2, $path & "\Windows7GifViewer", @SW_HIDE)
-						Run(@ComSpec & " /c " & $command3, $path & "\Windows7GifViewer", @SW_HIDE)
-						;Here commence normal Writes to the registry....all is good from here on
-						RegWrite('HKEY_CLASSES_ROOT\.GIF', '', 'REG_SZ', 'GIFImage.Document')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document', 'EditFlags', 'REG_DWORD', '65536')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document', 'FriendlyTypeName', 'REG_EXPAND_SZ', $path & "Windows7GifViewer" & '\shimgvw.dll,-306')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document', 'ImageOptionFlags', 'REG_DWORD', '0')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document', 'BrowserFlags', 'REG_DWORD', '8')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document', '', 'REG_SZ', 'GIF Image')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document\DefaultIcon', '', 'REG_EXPAND_SZ', $path & "Windows7GifViewer" & '\shimgvw.dll,4')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document\shell', '', 'REG_SZ', '')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document\shell\open', 'MuiVerb', 'REG_SZ', 'shimgvw.dll,-550')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document\shell\open\command', '', 'REG_EXPAND_SZ', $path & "\Windows7GifViewer" & '\rundll32.exe shimgvw.dll,ImageView_Fullscreen %1')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document\shell\open\DropTarget', 'Clsid', 'REG_SZ', '{E84FDA7C-1D6A-45F6-B725-CB260C236066}')
-						RegWrite('HKEY_CLASSES_ROOT\GIFImage.Document\shell\printto\command', '', 'REG_SZ', $path & "\Windows7GifViewer" & '\rundll32.exe shimgvw.dll,ImageView_PrintTo /pt "%1" "%2" "%3" "%4"')
-						RegWrite("HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers", $path & "\Windows7GifViewer" & "\rundll32.exe", "REG_SZ", "WINXPSP3")
-						;Corrected the key from HKLM to HKCU to make this work - This is why rundll32.exe was not actually being set to Windows SP3 mode
-						RegWrite("HKEY_CURRENT_USER\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers", $path & "\Windows7GifViewer" & "\rundll32.exe", "REG_SZ", "WINXPSP3")
-				MsgBox(1, "Installation Complete!", "To run double click or open any .Gif file. Run again to Uninstall")
-			EndIf
-		EndIf
-	EndIf
-EndFunc   ;==>SystemCheck
-
-Func Restart()
-	Run(@ScriptDir & "\Windows_7_Gif_Viewer.exe")
-EndFunc   ;==>Restart
+EndFunc
 
 Func Cleanup()
 	FileDelete(@TempDir & "\splash.jpg")
 EndFunc   ;==>Cleanup
-
-Sleep(100)
-CreateSplash()
-SystemCheck()
-Cleanup()
